@@ -13,6 +13,7 @@ const deviceFwEl = document.getElementById('deviceFw');
 const deviceBatteryEl = document.getElementById('deviceBattery');
 
 // Inputs
+const ledZoneSelect = document.getElementById('ledZone');
 const ledEffectSelect = document.getElementById('ledEffect');
 const ledColorInput = document.getElementById('ledColor');
 const ledBrightnessInput = document.getElementById('ledBrightness');
@@ -108,7 +109,7 @@ async function disconnectDevice() {
 function enableControls(enable) {
     const elements = [
         refreshInfoBtn, applyLightingBtn, readLightingBtn, applyPerfBtn, readPerfBtn,
-        ledEffectSelect, ledColorInput, ledBrightnessInput,
+        ledZoneSelect, ledEffectSelect, ledColorInput, ledBrightnessInput,
         pollRateSelect, dpiXInput, dpiYInput
     ];
     elements.forEach(el => el.disabled = !enable);
@@ -150,6 +151,19 @@ function handleResponse(responseArray) {
         deviceBatteryEl.textContent = `${decoded.percentage}%`;
     } else if (decoded.command === "GetExtendedBrightness" || decoded.command === "GetStandardBrightness") {
         ledBrightnessInput.value = decoded.brightness;
+    } else if (decoded.command === "GetExtendedMatrixEffect") {
+        const effMap = {
+            "static": 0,
+            "wave": 1,
+            "spectrum": 2,
+            "breathing": 3,
+            "reactive": 4,
+            "wheel": 5, // mapped roughly
+            "starlight": 5
+        };
+        if (effMap[decoded.effect] !== undefined) {
+            ledEffectSelect.value = effMap[decoded.effect];
+        }
     } else if (decoded.command === "GetPollingRate") {
         pollRateSelect.value = decoded.rate;
     } else if (decoded.command === "GetDPI") {
@@ -166,10 +180,13 @@ refreshInfoBtn.addEventListener('click', async () => {
 });
 
 readLightingBtn.addEventListener('click', async () => {
-    await sendCommand({ command: 'GetExtendedBrightness' });
+    const ledId = parseInt(ledZoneSelect.value);
+    await sendCommand({ command: 'GetExtendedBrightness', ledId: ledId });
+    await sendCommand({ command: 'GetExtendedMatrixEffect', ledId: ledId });
 });
 
 applyLightingBtn.addEventListener('click', async () => {
+    const ledId = parseInt(ledZoneSelect.value);
     const effectIndex = parseInt(ledEffectSelect.value);
     const colorHex = ledColorInput.value;
     const r = parseInt(colorHex.substr(1, 2), 16);
@@ -178,7 +195,7 @@ applyLightingBtn.addEventListener('click', async () => {
     const brightness = parseInt(ledBrightnessInput.value);
 
     // Apply brightness first
-    await sendCommand({ command: 'SetExtendedBrightness', brightness: brightness });
+    await sendCommand({ command: 'SetExtendedBrightness', brightness: brightness, ledId: ledId });
 
     // Determine effect string
     const effects = ['static', 'wave', 'spectrum', 'breathing', 'reactive', 'starlight'];
@@ -187,7 +204,8 @@ applyLightingBtn.addEventListener('click', async () => {
     await sendCommand({ 
         command: 'SetExtendedMatrixEffect', 
         effect: effectName,
-        r: r, g: g, b: b
+        r: r, g: g, b: b,
+        ledId: ledId
     });
 });
 
@@ -213,21 +231,25 @@ function logMessage(label, data, type) {
     const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit', fractionalSecondDigits: 3 });
     
     let displayData = data;
+    let rawToggle = "";
     
     if (typeof data === 'object' && data.raw) {
         // We received a JSON structured payload
         const jsonStr = JSON.stringify(data.request || data.response, null, 2);
-        const hexDump = Array.from(data.raw).slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join(' ') + '...';
+        const hexDump = Array.from(data.raw).map(b => b.toString(16).padStart(2, '0')).join(' ');
         
-        displayData = `<pre style="margin: 0; padding: 0.5rem 0; font-size: 0.8rem; color: #a3e635; font-family: monospace;">${jsonStr}</pre>
-                       <span style="color:#888; font-size:0.75rem;">Raw: ${hexDump}</span>`;
+        displayData = `<pre class="json-payload">${jsonStr}</pre>`;
+        rawToggle = ` <details style="display:inline-block; margin-left: 0.5rem; color:#888; font-size:0.75rem;">
+                         <summary style="cursor: pointer;">Raw Bytes</summary>
+                         <div style="word-break: break-all; margin-top: 0.25rem; font-family: monospace;">${hexDump}</div>
+                      </details>`;
     } else if (typeof data === 'object') {
         displayData = JSON.stringify(data);
     }
 
     entry.innerHTML = `
         <span class="log-time">[${time}]</span>
-        <span class="log-data"><span class="log-label">${label}</span> ${displayData}</span>
+        <span class="log-data"><span class="log-label">${label}</span>${rawToggle} ${displayData}</span>
     `;
     
     debugLog.appendChild(entry);

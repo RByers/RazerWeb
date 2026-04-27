@@ -95,6 +95,10 @@ const RazerProtocol = {
                 cmdClass = 0x0F; cmdId = 0x84; dataSize = 0x03;
                 args = [varStore, ledId, 0];
                 break;
+            case 'GetExtendedMatrixEffect':
+                cmdClass = 0x0F; cmdId = 0x82; dataSize = 0x03;
+                args = [varStore, ledId, 0];
+                break;
             case 'SetExtendedMatrixEffect':
                 cmdClass = 0x0F; cmdId = 0x02; 
                 if (msg.effect === 'none') {
@@ -252,34 +256,67 @@ const RazerProtocol = {
         } else if (c === 0x00 && i === 0x82) {
             res.command = "GetSerial";
             res.serial = a.map(x => String.fromCharCode(x)).join('').replace(/\0/g, '');
-        } else if (c === 0x00 && i === 0x84) {
-            res.command = "GetDeviceMode";
+        } else if (c === 0x00 && (i === 0x84 || i === 0x04)) {
+            res.command = i === 0x84 ? "GetDeviceMode" : "SetDeviceMode";
             res.mode = a[0];
-        } else if (c === 0x03 && i === 0x80) {
-            res.command = "GetStandardLedState";
+        } else if (c === 0x03 && (i === 0x80 || i === 0x00)) {
+            res.command = i === 0x80 ? "GetStandardLedState" : "SetStandardLedState";
             res.varStore = a[0]; res.ledId = a[1]; res.state = a[2] === 1;
-        } else if (c === 0x03 && i === 0x81) {
-            res.command = "GetStandardLedRGB";
+        } else if (c === 0x03 && (i === 0x81 || i === 0x01)) {
+            res.command = i === 0x81 ? "GetStandardLedRGB" : "SetStandardLedRGB";
             res.varStore = a[0]; res.ledId = a[1]; res.r = a[2]; res.g = a[3]; res.b = a[4];
-        } else if (c === 0x03 && i === 0x82) {
-            res.command = "GetStandardLedEffect";
+        } else if (c === 0x03 && (i === 0x82 || i === 0x02)) {
+            res.command = i === 0x82 ? "GetStandardLedEffect" : "SetStandardLedEffect";
             res.varStore = a[0]; res.ledId = a[1]; res.effect = a[2];
-        } else if (c === 0x03 && i === 0x83) {
-            res.command = "GetStandardBrightness";
+        } else if (c === 0x03 && (i === 0x83 || i === 0x03)) {
+            res.command = i === 0x83 ? "GetStandardBrightness" : "SetStandardBrightness";
             res.varStore = a[0]; res.ledId = a[1]; res.brightness = a[2];
-        } else if (c === 0x0F && i === 0x84) {
-            res.command = "GetExtendedBrightness";
+        } else if (c === 0x03 && i === 0x0A) {
+            res.command = "SetStandardMatrixEffect";
+            res.effectId = a[0];
+        } else if (c === 0x0F && (i === 0x84 || i === 0x04)) {
+            res.command = i === 0x84 ? "GetExtendedBrightness" : "SetExtendedBrightness";
             res.varStore = a[0]; res.ledId = a[1]; res.brightness = a[2];
-        } else if (c === 0x00 && i === 0x85) {
-            res.command = "GetPollingRate";
+        } else if (c === 0x0F && (i === 0x82 || i === 0x02)) {
+            res.command = i === 0x82 ? "GetExtendedMatrixEffect" : "SetExtendedMatrixEffect";
+            if (a.length >= 3) {
+                res.varStore = a[0]; res.ledId = a[1]; 
+                const effMap = {
+                    0x00: "none", 0x01: "static", 0x02: "breathing",
+                    0x03: "spectrum", 0x04: "wave", 0x05: "reactive",
+                    0x07: "starlight", 0x0A: "wheel"
+                };
+                res.effect = effMap[a[2]] || `unknown(${a[2]})`;
+                
+                if (a[2] === 0x01 && a.length >= 9) {
+                    res.r = a[6]; res.g = a[7]; res.b = a[8];
+                } else if (a[2] === 0x04 && a.length >= 5) {
+                    res.direction = a[3]; res.speed = a[4];
+                } else if (a[2] === 0x05 && a.length >= 9) {
+                    res.speed = a[4]; res.r = a[6]; res.g = a[7]; res.b = a[8];
+                } else if (a[2] === 0x02 && a.length >= 12) {
+                    res.type = a[3];
+                    if (a[3] === 1 || a[3] === 2) { res.r1 = a[6]; res.g1 = a[7]; res.b1 = a[8]; }
+                    if (a[3] === 2) { res.r2 = a[9]; res.g2 = a[10]; res.b2 = a[11]; }
+                } else if (a[2] === 0x07 && a.length >= 12) {
+                    res.speed = a[4]; res.type = a[5];
+                    if (a[5] === 1 || a[5] === 2) { res.r1 = a[6]; res.g1 = a[7]; res.b1 = a[8]; }
+                    if (a[5] === 2) { res.r2 = a[9]; res.g2 = a[10]; res.b2 = a[11]; }
+                }
+            }
+        } else if (c === 0x00 && (i === 0x85 || i === 0x05)) {
+            res.command = i === 0x85 ? "GetPollingRate" : "SetPollingRate";
             res.rate = a[0] === 0x01 ? 1000 : (a[0] === 0x08 ? 125 : 500);
-        } else if (c === 0x04 && i === 0x85) {
-            res.command = "GetDPI";
+        } else if (c === 0x00 && i === 0x40) {
+            res.command = "SetHighPollingRate";
+            res.hzFlag = a[1];
+        } else if (c === 0x04 && (i === 0x85 || i === 0x05)) {
+            res.command = i === 0x85 ? "GetDPI" : "SetDPI";
             res.varStore = a[0];
             res.dpiX = (a[1] << 8) | a[2];
             res.dpiY = (a[3] << 8) | a[4];
-        } else if (c === 0x04 && i === 0x86) {
-            res.command = "GetDPIStages";
+        } else if (c === 0x04 && (i === 0x86 || i === 0x06)) {
+            res.command = i === 0x86 ? "GetDPIStages" : "SetDPIStages";
             res.varStore = a[0];
             res.activeStage = a[1];
             res.stageCount = a[2];
@@ -300,10 +337,27 @@ const RazerProtocol = {
         } else if (c === 0x07 && i === 0x84) {
             res.command = "GetChargingStatus";
             res.isCharging = a[1] === 1;
+        } else if (c === 0x07 && i === 0x01) {
+            res.command = "SetLowBatteryThreshold";
+            res.threshold = a[0];
+        } else if (c === 0x07 && i === 0x03) {
+            res.command = "SetIdleTime";
+            res.seconds = (a[0] << 8) | a[1];
+        } else if (c === 0x02 && i === 0x14) {
+            res.command = "SetScrollMode";
+            res.varStore = a[0]; res.mode = a[1];
+        } else if (c === 0x02 && i === 0x16) {
+            res.command = "SetScrollAcceleration";
+            res.varStore = a[0]; res.state = a[1] === 1;
+        } else if (c === 0x02 && i === 0x17) {
+            res.command = "SetSmartReel";
+            res.varStore = a[0]; res.state = a[1] === 1;
         } else {
             // Unmapped incoming command
             res.command = `Unknown`;
         }
+
+        delete res.rawArgs;
 
         return res;
     }
