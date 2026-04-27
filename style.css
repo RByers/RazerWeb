@@ -202,9 +202,14 @@ input[type="range"] {
     accent-color: var(--razer-green);
 }
 
-.card .btn {
-    width: 100%;
+.button-group {
+    display: flex;
+    gap: 0.5rem;
     margin-top: 0.5rem;
+}
+
+.card .btn {
+    flex: 1;
 }
 
 .debug-section {

@@ -2,7 +2,9 @@
 const connectBtn = document.getElementById('connectBtn');
 const refreshInfoBtn = document.getElementById('refreshInfoBtn');
 const applyLightingBtn = document.getElementById('applyLightingBtn');
+const readLightingBtn = document.getElementById('readLightingBtn');
 const applyPerfBtn = document.getElementById('applyPerfBtn');
+const readPerfBtn = document.getElementById('readPerfBtn');
 const clearLogBtn = document.getElementById('clearLogBtn');
 const debugLog = document.getElementById('debugLog');
 
@@ -20,11 +22,9 @@ const dpiYInput = document.getElementById('dpiY');
 
 // State
 let razerDevice = null;
-let transactionId = 0;
 
 // Protocol Constants
 const RAZER_VENDOR_ID = 0x1532;
-const REPORT_LENGTH = 90;
 
 // Connect to WebHID
 connectBtn.addEventListener('click', async () => {
@@ -47,8 +47,6 @@ connectBtn.addEventListener('click', async () => {
 });
 
 async function connectDevice(devices) {
-    // A single physical Razer mouse exposes multiple HID interfaces (devices).
-    // We need to find the interface that accepts our Feature Reports.
     logMessage('SYS', `Finding correct configuration interface among ${devices.length} endpoints...`, 'tx');
     
     for (const device of devices) {
@@ -57,23 +55,17 @@ async function connectDevice(devices) {
                 await device.open();
             }
 
-            // Try to send a Get Firmware Version feature report
-            const fwReport = buildReport(0x00, 0x81, 0x02, []);
+            const fwReport = RazerProtocol.encode({ command: 'GetFirmware' });
             await device.sendFeatureReport(0x00, fwReport);
-            
-            // Wait 90ms to give the device plenty of time to process
             await new Promise(r => setTimeout(r, 90));
             
-            // Try to receive the response
             const responseData = await device.receiveFeatureReport(0x00);
             let responseArray = new Uint8Array(responseData.buffer);
             
-            // If WebHID included the Report ID (0x00) as the first byte, strip it
             if (responseArray.byteLength === 91 && responseArray[0] === 0x00) {
                 responseArray = responseArray.slice(1);
             }
             
-            // If we succeed, this is the correct interface!
             razerDevice = device;
             deviceNameEl.textContent = device.productName || 'Unknown Razer Device';
             connectBtn.textContent = 'Disconnect';
@@ -82,20 +74,15 @@ async function connectDevice(devices) {
             enableControls(true);
             logMessage('SYS', `Successfully connected to interface: ${device.productName}`, 'tx');
             
-            // Parse the firmware response we just got
-            parseResponse(responseArray);
+            handleResponse(responseArray);
             
-            // Fetch battery info
             setTimeout(async () => {
-                const batReport = buildReport(0x07, 0x80, 0x02, []);
-                await sendReport(batReport);
+                await sendCommand({ command: 'GetBattery' });
             }, 100);
 
-            return; // Exit once we found the right one
+            return;
         } catch (err) {
-            // This interface didn't work, close it and try the next one
             if (device.opened) await device.close();
-            console.log(`Interface ${device.productName} failed:`, err);
         }
     }
 
@@ -120,145 +107,93 @@ async function disconnectDevice() {
 
 function enableControls(enable) {
     const elements = [
-        refreshInfoBtn, applyLightingBtn, applyPerfBtn,
+        refreshInfoBtn, applyLightingBtn, readLightingBtn, applyPerfBtn, readPerfBtn,
         ledEffectSelect, ledColorInput, ledBrightnessInput,
         pollRateSelect, dpiXInput, dpiYInput
     ];
     elements.forEach(el => el.disabled = !enable);
 }
 
-// OpenRazer Protocol Logic
-function calculateCrc(report) {
-    let crc = 0;
-    for (let i = 2; i < 88; i++) {
-        crc ^= report[i];
-    }
-    return crc;
-}
-
-function buildReport(commandClass, commandId, dataSize, args) {
-    const report = new Uint8Array(REPORT_LENGTH);
-    
-    // Header
-    report[0] = 0x00; // Status (New Command)
-    report[1] = 0xFF; // Transaction ID (OpenRazer uses 0xFF)
-    report[2] = 0x00; // Remaining Packets (H)
-    report[3] = 0x00; // Remaining Packets (L)
-    report[4] = 0x00; // Protocol Type
-    report[5] = dataSize;
-    report[6] = commandClass;
-    report[7] = commandId;
-
-    // Arguments
-    if (args && args.length > 0) {
-        for (let i = 0; i < args.length && i < 80; i++) {
-            report[8 + i] = args[i];
-        }
-    }
-
-    // CRC
-    report[88] = calculateCrc(report);
-    report[89] = 0x00; // Reserved
-
-    return report;
-}
-
-async function sendReport(report) {
+async function sendCommand(cmdObj) {
     if (!razerDevice) return null;
 
-    const hexDump = Array.from(report).map(b => b.toString(16).padStart(2, '0')).join(' ');
-    logMessage('TX', hexDump, 'tx');
+    const report = RazerProtocol.encode(cmdObj);
+    logMessage('TX', { request: cmdObj, raw: report }, 'tx');
 
     try {
         await razerDevice.sendFeatureReport(0x00, report);
         
-        // Wait 90ms for device to process command
         await new Promise(r => setTimeout(r, 90));
         
-        // Fetch the response
         const responseData = await razerDevice.receiveFeatureReport(0x00);
         let responseArray = new Uint8Array(responseData.buffer);
         
-        // If WebHID included the Report ID (0x00) as the first byte, strip it
         if (responseArray.byteLength === 91 && responseArray[0] === 0x00) {
             responseArray = responseArray.slice(1);
         }
         
-        const rxDump = Array.from(responseArray).map(b => b.toString(16).padStart(2, '0')).join(' ');
-        logMessage('RX', rxDump, 'rx');
-        
-        parseResponse(responseArray);
+        handleResponse(responseArray);
     } catch (err) {
         logMessage('ERROR', `Send/Receive failed: ${err.message}`, 'error');
     }
 }
 
-function parseResponse(response) {
-    // Only process our transaction
-    // If status == 0x02 (Success), we can read data
-    const status = response[0];
-    const cmdClass = response[6];
-    const cmdId = response[7];
-    const args = response.slice(8, 88);
+function handleResponse(responseArray) {
+    const decoded = RazerProtocol.decode(responseArray);
+    logMessage('RX', { response: decoded, raw: responseArray }, 'rx');
 
-    if (status !== 0x02) return;
+    if (decoded.status !== "SUCCESS") return;
 
-    // Get Firmware Version: Class 0x00, CMD 0x81
-    if (cmdClass === 0x00 && cmdId === 0x81) {
-        deviceFwEl.textContent = `v${args[0]}.${args[1]}`;
-    }
-
-    // Get Battery Level: Class 0x07, CMD 0x80
-    if (cmdClass === 0x07 && cmdId === 0x80) {
-        const battery = args[1];
-        deviceBatteryEl.textContent = `${Math.round((battery / 255) * 100)}%`;
+    if (decoded.command === "GetFirmware") {
+        deviceFwEl.textContent = decoded.version;
+    } else if (decoded.command === "GetBattery") {
+        deviceBatteryEl.textContent = `${decoded.percentage}%`;
+    } else if (decoded.command === "GetExtendedBrightness" || decoded.command === "GetStandardBrightness") {
+        ledBrightnessInput.value = decoded.brightness;
+    } else if (decoded.command === "GetPollingRate") {
+        pollRateSelect.value = decoded.rate;
+    } else if (decoded.command === "GetDPI") {
+        dpiXInput.value = decoded.dpiX;
+        dpiYInput.value = decoded.dpiY;
     }
 }
 
-// App Actions
-async function fetchDeviceInfo() {
-    // Get Firmware
-    const fwReport = buildReport(0x00, 0x81, 0x02, []);
-    await sendReport(fwReport);
-
-    // Get Battery
+refreshInfoBtn.addEventListener('click', async () => {
+    await sendCommand({ command: 'GetFirmware' });
     setTimeout(async () => {
-        const batReport = buildReport(0x07, 0x80, 0x02, []);
-        await sendReport(batReport);
+        await sendCommand({ command: 'GetBattery' });
     }, 100);
-}
+});
 
-refreshInfoBtn.addEventListener('click', fetchDeviceInfo);
+readLightingBtn.addEventListener('click', async () => {
+    await sendCommand({ command: 'GetExtendedBrightness' });
+});
 
 applyLightingBtn.addEventListener('click', async () => {
-    const effect = parseInt(ledEffectSelect.value);
+    const effectIndex = parseInt(ledEffectSelect.value);
     const colorHex = ledColorInput.value;
     const r = parseInt(colorHex.substr(1, 2), 16);
     const g = parseInt(colorHex.substr(3, 2), 16);
     const b = parseInt(colorHex.substr(5, 2), 16);
     const brightness = parseInt(ledBrightnessInput.value);
 
-    // Set Brightness (Standard: Class 0x03, CMD 0x03)
-    const brightReport = buildReport(0x03, 0x03, 0x03, [0x01, 0x00, brightness]); // VarStore=1, LedId=0 (typically scroll or logo)
-    await sendReport(brightReport);
+    // Apply brightness first
+    await sendCommand({ command: 'SetExtendedBrightness', brightness: brightness });
 
-    setTimeout(async () => {
-        let effectReport;
-        if (effect === 0) { // Static (Standard Matrix Static: Class 0x03, CMD 0x0A, Effect 0x06)
-            effectReport = buildReport(0x03, 0x0A, 0x04, [0x06, r, g, b]);
-        } else if (effect === 1) { // Wave
-            effectReport = buildReport(0x03, 0x0A, 0x02, [0x01, 0x01]); // Dir 1
-        } else if (effect === 2) { // Spectrum
-            effectReport = buildReport(0x03, 0x0A, 0x01, [0x04]);
-        } else if (effect === 3) { // Breathing (Random)
-            effectReport = buildReport(0x03, 0x0A, 0x08, [0x03, 0x03, 0,0,0, 0,0,0]);
-        } else if (effect === 4) { // Reactive
-            effectReport = buildReport(0x03, 0x0A, 0x05, [0x02, 0x01, r, g, b]);
-        } else if (effect === 5) { // Starlight
-            effectReport = buildReport(0x03, 0x0A, 0x01, [0x19, 0x03, 0x01, 0,0,0, 0,0,0]);
-        }
-        if (effectReport) await sendReport(effectReport);
-    }, 100);
+    // Determine effect string
+    const effects = ['static', 'wave', 'spectrum', 'breathing', 'reactive', 'starlight'];
+    const effectName = effects[effectIndex] || 'static';
+
+    await sendCommand({ 
+        command: 'SetExtendedMatrixEffect', 
+        effect: effectName,
+        r: r, g: g, b: b
+    });
+});
+
+readPerfBtn.addEventListener('click', async () => {
+    await sendCommand({ command: 'GetPollingRate' });
+    await sendCommand({ command: 'GetDPI' });
 });
 
 applyPerfBtn.addEventListener('click', async () => {
@@ -266,22 +201,8 @@ applyPerfBtn.addEventListener('click', async () => {
     const dx = parseInt(dpiXInput.value);
     const dy = parseInt(dpiYInput.value);
 
-    // Set Polling Rate (Class 0x00, CMD 0x05)
-    let rateArg = 0x02; // 500Hz
-    if (rate === 1000) rateArg = 0x01;
-    if (rate === 125) rateArg = 0x08;
-    const rateReport = buildReport(0x00, 0x05, 0x01, [rateArg]);
-    await sendReport(rateReport);
-
-    // Set DPI (Class 0x04, CMD 0x05)
-    setTimeout(async () => {
-        const dxH = (dx >> 8) & 0xFF;
-        const dxL = dx & 0xFF;
-        const dyH = (dy >> 8) & 0xFF;
-        const dyL = dy & 0xFF;
-        const dpiReport = buildReport(0x04, 0x05, 0x07, [0x01, dxH, dxL, dyH, dyL, 0x00, 0x00]);
-        await sendReport(dpiReport);
-    }, 100);
+    await sendCommand({ command: 'SetPollingRate', rate: rate });
+    await sendCommand({ command: 'SetDPI', dpiX: dx, dpiY: dy });
 });
 
 // Debug Logging
@@ -291,20 +212,28 @@ function logMessage(label, data, type) {
     
     const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit', fractionalSecondDigits: 3 });
     
+    let displayData = data;
+    
+    if (typeof data === 'object' && data.raw) {
+        // We received a JSON structured payload
+        const jsonStr = JSON.stringify(data.request || data.response, null, 2);
+        const hexDump = Array.from(data.raw).slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join(' ') + '...';
+        
+        displayData = `<pre style="margin: 0; padding: 0.5rem 0; font-size: 0.8rem; color: #a3e635; font-family: monospace;">${jsonStr}</pre>
+                       <span style="color:#888; font-size:0.75rem;">Raw: ${hexDump}</span>`;
+    } else if (typeof data === 'object') {
+        displayData = JSON.stringify(data);
+    }
+
     entry.innerHTML = `
         <span class="log-time">[${time}]</span>
-        <span class="log-data"><span class="log-label">${label}</span> ${data}</span>
+        <span class="log-data"><span class="log-label">${label}</span> ${displayData}</span>
     `;
     
     debugLog.appendChild(entry);
     debugLog.scrollTop = debugLog.scrollHeight;
 }
 
-clearLogBtn.addEventListener('click', () => {
-    debugLog.innerHTML = '';
-});
-
-// WebHID auto-connect on load if already granted
 navigator.hid.getDevices().then(devices => {
     const razerDevices = devices.filter(d => d.vendorId === RAZER_VENDOR_ID);
     if (razerDevices.length > 0) {

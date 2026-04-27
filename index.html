@@ -48,7 +48,10 @@
                         <label for="ledBrightness">Brightness</label>
                         <input type="range" id="ledBrightness" min="0" max="255" value="255" disabled>
                     </div>
-                    <button id="applyLightingBtn" class="btn btn-primary" disabled>Apply Lighting</button>
+                    <div class="button-group">
+                        <button id="readLightingBtn" class="btn btn-secondary" disabled>Read</button>
+                        <button id="applyLightingBtn" class="btn btn-primary" disabled>Apply</button>
+                    </div>
                 </div>
 
                 <div class="card dpi-control">
@@ -69,7 +72,10 @@
                         <label for="dpiY">DPI Y</label>
                         <input type="number" id="dpiY" min="100" max="26000" value="800" disabled>
                     </div>
-                    <button id="applyPerfBtn" class="btn btn-primary" disabled>Apply Performance</button>
+                    <div class="button-group">
+                        <button id="readPerfBtn" class="btn btn-secondary" disabled>Read</button>
+                        <button id="applyPerfBtn" class="btn btn-primary" disabled>Apply</button>
+                    </div>
                 </div>
             </aside>
 
@@ -87,6 +93,7 @@
             </section>
         </main>
     </div>
+    <script src="protocol.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
