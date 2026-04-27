@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Razer Web Configurator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo">
+                <h1><span class="highlight">Razer</span> Web Config</h1>
+            </div>
+            <button id="connectBtn" class="btn btn-primary">Connect Device</button>
+        </header>
+
+        <main class="app-main">
+            <!-- Sidebar for controls -->
+            <aside class="controls-sidebar">
+                <div class="card device-info">
+                    <h2>Device Info</h2>
+                    <p><strong>Name:</strong> <span id="deviceName">Not Connected</span></p>
+                    <p><strong>Firmware:</strong> <span id="deviceFw">N/A</span></p>
+                    <p><strong>Battery:</strong> <span id="deviceBattery">N/A</span></p>
+                    <button id="refreshInfoBtn" class="btn btn-secondary" disabled>Refresh Info</button>
+                </div>
+
+                <div class="card led-control">
+                    <h2>Lighting</h2>
+                    <div class="form-group">
+                        <label for="ledEffect">Effect</label>
+                        <select id="ledEffect" disabled>
+                            <option value="0">Static</option>
+                            <option value="1">Wave</option>
+                            <option value="2">Spectrum</option>
+                            <option value="3">Breathing</option>
+                            <option value="4">Reactive</option>
+                            <option value="5">Starlight</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ledColor">Color</label>
+                        <input type="color" id="ledColor" value="#00FF00" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label for="ledBrightness">Brightness</label>
+                        <input type="range" id="ledBrightness" min="0" max="255" value="255" disabled>
+                    </div>
+                    <button id="applyLightingBtn" class="btn btn-primary" disabled>Apply Lighting</button>
+                </div>
+
+                <div class="card dpi-control">
+                    <h2>Performance</h2>
+                    <div class="form-group">
+                        <label for="dpiSelect">Polling Rate</label>
+                        <select id="pollRate" disabled>
+                            <option value="125">125 Hz</option>
+                            <option value="500">500 Hz</option>
+                            <option value="1000" selected>1000 Hz</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="dpiX">DPI X</label>
+                        <input type="number" id="dpiX" min="100" max="26000" value="800" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label for="dpiY">DPI Y</label>
+                        <input type="number" id="dpiY" min="100" max="26000" value="800" disabled>
+                    </div>
+                    <button id="applyPerfBtn" class="btn btn-primary" disabled>Apply Performance</button>
+                </div>
+            </aside>
+
+            <!-- Main content for Debug / Log -->
+            <section class="debug-section">
+                <div class="card debug-card">
+                    <div class="debug-header">
+                        <h2>Protocol Debugger</h2>
+                        <button id="clearLogBtn" class="btn btn-secondary btn-small">Clear Log</button>
+                    </div>
+                    <div id="debugLog" class="debug-log">
+                        <!-- Log entries will appear here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
