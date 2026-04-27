@@ -13,7 +13,12 @@
             <div class="logo">
                 <h1><span class="highlight">Razer</span> Web Config</h1>
             </div>
-            <button id="connectBtn" class="btn btn-primary">Connect Device</button>
+            <div class="header-controls">
+                <label class="toggle-label" title="Show all controls, even for unsupported features">
+                    <input type="checkbox" id="showAllToggle"> Show All
+                </label>
+                <button id="connectBtn" class="btn btn-primary">Connect Device</button>
+            </div>
         </header>
 
         <main class="app-main">
@@ -189,6 +194,7 @@
         </main>
     </div>
     <script src="protocol.js"></script>
+    <script src="devices.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

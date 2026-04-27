@@ -12,6 +12,7 @@ const applyScrollBtn = document.getElementById('applyScrollBtn');
 const readPowerBtn = document.getElementById('readPowerBtn');
 const applyPowerBtn = document.getElementById('applyPowerBtn');
 const clearLogBtn = document.getElementById('clearLogBtn');
+const showAllToggle = document.getElementById('showAllToggle');
 const debugLog = document.getElementById('debugLog');
 
 const deviceNameEl = document.getElementById('deviceName');
@@ -50,27 +51,135 @@ const smartReelSelect = document.getElementById('smartReel');
 const idleTimeInput = document.getElementById('idleTime');
 const lowBatteryThresholdSelect = document.getElementById('lowBatteryThreshold');
 
+// Cards
+const ledControlCard = document.querySelector('.led-control');
+const scrollControlCard = document.querySelector('.scroll-control');
+const powerControlCard = document.querySelector('.power-control');
+
 // State
 let razerDevice = null;
-
-// Protocol Constants
+let deviceProfile = null; // current device capability profile
 const RAZER_VENDOR_ID = 0x1532;
 
-// Connect to WebHID
-connectBtn.addEventListener('click', async () => {
-    if (razerDevice) {
-        await disconnectDevice();
-        return;
+// ── Capability-driven UI ──
+
+function applyCapabilities(profile) {
+    deviceProfile = profile;
+    const showAll = showAllToggle.checked;
+
+    // Lighting card: hidden if no LED zones
+    setCapVis(ledControlCard, showAll || DeviceCapabilities.hasAnyLed(profile));
+
+    // Scroll card
+    const hasScroll = DeviceCapabilities.hasCap(profile, 'scroll_mode');
+    setCapVis(scrollControlCard, showAll || hasScroll);
+
+    // Power card
+    const hasBattery = DeviceCapabilities.hasCap(profile, 'battery');
+    const hasIdle = DeviceCapabilities.hasCap(profile, 'idle_time');
+    setCapVis(powerControlCard, showAll || hasBattery || hasIdle);
+
+    // Battery/Charging in device info
+    setCapVis(deviceBatteryEl.parentElement, showAll || hasBattery);
+    setCapVis(deviceChargingEl.parentElement, showAll || hasBattery);
+
+    // Populate LED zone dropdown from profile zones
+    updateZoneDropdown(profile, showAll);
+
+    // Populate effect dropdown from zone capabilities
+    updateEffectDropdown(profile, showAll);
+}
+
+function setCapVis(el, visible) {
+    if (!el) return;
+    if (visible) el.classList.remove('cap-hidden');
+    else el.classList.add('cap-hidden');
+}
+
+function updateZoneDropdown(profile, showAll) {
+    const prev = ledZoneSelect.value;
+    ledZoneSelect.innerHTML = '';
+
+    if (showAll) {
+        // Show all standard zones
+        const allZones = [
+            { value: '0', label: 'All / Default (0)' },
+            { value: '1', label: 'Scroll Wheel (1)' },
+            { value: '4', label: 'Logo (4)' },
+            { value: '5', label: 'Backlight (5)' },
+        ];
+        allZones.forEach(z => {
+            const opt = document.createElement('option');
+            opt.value = z.value; opt.textContent = z.label;
+            ledZoneSelect.appendChild(opt);
+        });
+    } else {
+        const zoneMap = { logo: ['4', 'Logo (4)'], scroll: ['1', 'Scroll Wheel (1)'], backlight: ['5', 'Backlight (5)'] };
+        for (const [key, [val, label]] of Object.entries(zoneMap)) {
+            if (profile.zones[key]) {
+                const opt = document.createElement('option');
+                opt.value = val; opt.textContent = label;
+                ledZoneSelect.appendChild(opt);
+            }
+        }
     }
 
-    try {
-        const devices = await navigator.hid.requestDevice({
-            filters: [{ vendorId: RAZER_VENDOR_ID }]
-        });
+    // Restore selection if still valid
+    if (ledZoneSelect.querySelector(`option[value="${prev}"]`)) {
+        ledZoneSelect.value = prev;
+    }
+}
 
-        if (devices.length > 0) {
-            await connectDevice(devices);
+function updateEffectDropdown(profile, showAll) {
+    const prev = ledEffectSelect.value;
+    ledEffectSelect.innerHTML = '';
+
+    let effects;
+    if (showAll) {
+        effects = ['none', 'static', 'wave', 'spectrum', 'breathing', 'reactive', 'starlight', 'wheel'];
+    } else {
+        // Merge effects from all zones
+        const set = new Set();
+        for (const zone of Object.values(profile.zones)) {
+            zone.effects.forEach(e => set.add(e));
         }
+        effects = ['none', 'static', 'wave', 'spectrum', 'breathing', 'reactive', 'starlight', 'wheel']
+            .filter(e => set.has(e));
+    }
+
+    const labels = {
+        none: 'None / Off', static: 'Static', wave: 'Wave', spectrum: 'Spectrum',
+        breathing: 'Breathing', reactive: 'Reactive', starlight: 'Starlight', wheel: 'Wheel'
+    };
+    effects.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e; opt.textContent = labels[e] || e;
+        ledEffectSelect.appendChild(opt);
+    });
+
+    if (ledEffectSelect.querySelector(`option[value="${prev}"]`)) {
+        ledEffectSelect.value = prev;
+    }
+    updateLightingUI();
+}
+
+showAllToggle.addEventListener('change', () => {
+    if (deviceProfile) applyCapabilities(deviceProfile);
+});
+
+ledZoneSelect.addEventListener('change', () => {
+    if (deviceProfile && !showAllToggle.checked) {
+        updateEffectDropdown(deviceProfile, false);
+    }
+});
+
+// ── Connection ──
+
+connectBtn.addEventListener('click', async () => {
+    if (razerDevice) { await disconnectDevice(); return; }
+    try {
+        const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: RAZER_VENDOR_ID }] });
+        if (devices.length > 0) await connectDevice(devices);
     } catch (err) {
         logMessage('ERROR', `Connection failed: ${err.message}`, 'error');
     }
@@ -81,9 +190,7 @@ async function connectDevice(devices) {
 
     for (const device of devices) {
         try {
-            if (!device.opened) {
-                await device.open();
-            }
+            if (!device.opened) await device.open();
 
             const fwReport = RazerProtocol.encode({ command: 'GetFirmware' });
             await device.sendFeatureReport(0x00, fwReport);
@@ -91,7 +198,6 @@ async function connectDevice(devices) {
 
             const responseData = await device.receiveFeatureReport(0x00);
             let responseArray = new Uint8Array(responseData.buffer);
-
             if (responseArray.byteLength === 91 && responseArray[0] === 0x00) {
                 responseArray = responseArray.slice(1);
             }
@@ -101,16 +207,27 @@ async function connectDevice(devices) {
             connectBtn.textContent = 'Disconnect';
             connectBtn.classList.replace('btn-primary', 'btn-secondary');
 
+            // Look up device profile by PID
+            const profile = DeviceCapabilities.getProfile(device.productId) || DeviceCapabilities.defaultProfile;
+            if (!DeviceCapabilities.getProfile(device.productId)) {
+                logMessage('SYS', `Unknown device PID 0x${device.productId.toString(16).padStart(4,'0')} — showing all controls. Use "Show All" toggle to control visibility.`, 'tx');
+            } else {
+                logMessage('SYS', `Matched device profile: ${profile.name}`, 'tx');
+            }
+
+            applyCapabilities(profile);
             enableControls(true);
             logMessage('SYS', `Successfully connected to interface: ${device.productName}`, 'tx');
 
             handleResponse(responseArray);
 
-            // Fetch additional device info
+            // Fetch additional info based on capabilities
             setTimeout(async () => {
                 await sendCommand({ command: 'GetSerial' });
-                await sendCommand({ command: 'GetBattery' });
-                await sendCommand({ command: 'GetChargingStatus' });
+                if (DeviceCapabilities.hasCap(profile, 'battery')) {
+                    await sendCommand({ command: 'GetBattery' });
+                    await sendCommand({ command: 'GetChargingStatus' });
+                }
             }, 100);
 
             return;
@@ -126,6 +243,7 @@ async function disconnectDevice() {
     if (razerDevice) {
         await razerDevice.close();
         razerDevice = null;
+        deviceProfile = null;
 
         deviceNameEl.textContent = 'Not Connected';
         deviceSerialEl.textContent = 'N/A';
@@ -136,6 +254,9 @@ async function disconnectDevice() {
         connectBtn.classList.replace('btn-secondary', 'btn-primary');
 
         enableControls(false);
+        // Show all cards again when disconnected
+        [ledControlCard, scrollControlCard, powerControlCard].forEach(c => c && c.classList.remove('cap-hidden'));
+        [deviceBatteryEl.parentElement, deviceChargingEl.parentElement].forEach(e => e && e.classList.remove('cap-hidden'));
         logMessage('SYS', 'Device disconnected', 'error');
     }
 }
@@ -153,6 +274,8 @@ function enableControls(enable) {
     elements.forEach(el => el.disabled = !enable);
     if (enable) updateLightingUI();
 }
+
+// ── Lighting UI ──
 
 function updateLightingUI() {
     const eff = ledEffectSelect.value;
@@ -191,26 +314,30 @@ function updateBreathingUI() {
         colorContainer.classList.remove('hidden');
         color2Container.classList.remove('hidden');
     }
-    // type 3 (random) = no color pickers
 }
 
 ledEffectSelect.addEventListener('change', updateLightingUI);
 breathingTypeSelect.addEventListener('change', updateBreathingUI);
 
+// ── Command send/receive ──
+
 async function sendCommand(cmdObj) {
     if (!razerDevice) return null;
+
+    // Apply device-specific transaction ID
+    if (deviceProfile && deviceProfile.transactionId && cmdObj.transactionId === undefined) {
+        cmdObj.transactionId = deviceProfile.transactionId;
+    }
 
     const report = RazerProtocol.encode(cmdObj);
     logMessage('TX', { request: cmdObj, raw: report }, 'tx');
 
     try {
         await razerDevice.sendFeatureReport(0x00, report);
-
         await new Promise(r => setTimeout(r, 90));
 
         const responseData = await razerDevice.receiveFeatureReport(0x00);
         let responseArray = new Uint8Array(responseData.buffer);
-
         if (responseArray.byteLength === 91 && responseArray[0] === 0x00) {
             responseArray = responseArray.slice(1);
         }
@@ -281,45 +408,32 @@ function handleResponse(responseArray) {
 function populateEffectUI(decoded) {
     if (!decoded.effect) return;
 
-    // Set effect dropdown
-    const effName = decoded.effect;
-    const option = ledEffectSelect.querySelector(`option[value="${effName}"]`);
-    if (option) {
-        ledEffectSelect.value = effName;
-    }
+    const option = ledEffectSelect.querySelector(`option[value="${decoded.effect}"]`);
+    if (option) ledEffectSelect.value = decoded.effect;
     updateLightingUI();
 
-    // Populate parameters from response
-    if (decoded.r !== undefined) {
-        ledColorInput.value = hexColor(decoded.r, decoded.g, decoded.b);
-    }
-    if (decoded.r1 !== undefined) {
-        ledColorInput.value = hexColor(decoded.r1, decoded.g1, decoded.b1);
-    }
-    if (decoded.r2 !== undefined) {
-        ledColor2Input.value = hexColor(decoded.r2, decoded.g2, decoded.b2);
-    }
-    if (decoded.speed !== undefined) {
-        ledSpeedInput.value = decoded.speed;
-    }
-    if (decoded.direction !== undefined) {
-        ledDirectionSelect.value = decoded.direction;
-    }
+    if (decoded.r !== undefined) ledColorInput.value = hexColor(decoded.r, decoded.g, decoded.b);
+    if (decoded.r1 !== undefined) ledColorInput.value = hexColor(decoded.r1, decoded.g1, decoded.b1);
+    if (decoded.r2 !== undefined) ledColor2Input.value = hexColor(decoded.r2, decoded.g2, decoded.b2);
+    if (decoded.speed !== undefined) ledSpeedInput.value = decoded.speed;
+    if (decoded.direction !== undefined) ledDirectionSelect.value = decoded.direction;
     if (decoded.type !== undefined) {
         breathingTypeSelect.value = decoded.type;
         updateBreathingUI();
     }
 }
 
-// ── Device Info ──
+// ── Event Handlers ──
+
 refreshInfoBtn.addEventListener('click', async () => {
     await sendCommand({ command: 'GetFirmware' });
     await sendCommand({ command: 'GetSerial' });
-    await sendCommand({ command: 'GetBattery' });
-    await sendCommand({ command: 'GetChargingStatus' });
+    if (deviceProfile && DeviceCapabilities.hasCap(deviceProfile, 'battery')) {
+        await sendCommand({ command: 'GetBattery' });
+        await sendCommand({ command: 'GetChargingStatus' });
+    }
 });
 
-// ── Brightness ──
 readBrightnessBtn.addEventListener('click', async () => {
     const ledId = parseInt(ledZoneSelect.value);
     await sendCommand({ command: 'GetExtendedBrightness', ledId: ledId });
@@ -331,7 +445,6 @@ applyBrightnessBtn.addEventListener('click', async () => {
     await sendCommand({ command: 'SetExtendedBrightness', brightness: brightness, ledId: ledId });
 });
 
-// ── Effects ──
 readEffectBtn.addEventListener('click', async () => {
     const ledId = parseInt(ledZoneSelect.value);
     await sendCommand({ command: 'GetExtendedMatrixEffect', ledId: ledId });
@@ -384,7 +497,6 @@ applyEffectBtn.addEventListener('click', async () => {
     await sendCommand(cmdObj);
 });
 
-// ── Performance ──
 readPerfBtn.addEventListener('click', async () => {
     await sendCommand({ command: 'GetPollingRate' });
     await sendCommand({ command: 'GetDPI' });
@@ -394,12 +506,10 @@ applyPerfBtn.addEventListener('click', async () => {
     const rate = parseInt(pollRateSelect.value);
     const dx = parseInt(dpiXInput.value);
     const dy = parseInt(dpiYInput.value);
-
     await sendCommand({ command: 'SetPollingRate', rate: rate });
     await sendCommand({ command: 'SetDPI', dpiX: dx, dpiY: dy });
 });
 
-// ── Scroll Wheel ──
 readScrollBtn.addEventListener('click', async () => {
     await sendCommand({ command: 'GetScrollMode' });
     await sendCommand({ command: 'GetScrollAcceleration' });
@@ -412,7 +522,6 @@ applyScrollBtn.addEventListener('click', async () => {
     await sendCommand({ command: 'SetSmartReel', state: smartReelSelect.value === '1' });
 });
 
-// ── Power Management ──
 readPowerBtn.addEventListener('click', async () => {
     await sendCommand({ command: 'GetIdleTime' });
     await sendCommand({ command: 'GetLowBatteryThreshold' });
@@ -425,12 +534,10 @@ applyPowerBtn.addEventListener('click', async () => {
     await sendCommand({ command: 'SetLowBatteryThreshold', threshold: threshold });
 });
 
-// ── Clear Log ──
-clearLogBtn.addEventListener('click', () => {
-    debugLog.innerHTML = '';
-});
+clearLogBtn.addEventListener('click', () => { debugLog.innerHTML = ''; });
 
-// Debug Logging
+// ── Debug Logging ──
+
 function logMessage(label, data, type) {
     const entry = document.createElement('div');
     entry.className = `log-entry ${type}`;
