@@ -22,8 +22,10 @@
                 <div class="card device-info">
                     <h2>Device Info</h2>
                     <p><strong>Name:</strong> <span id="deviceName">Not Connected</span></p>
+                    <p><strong>Serial:</strong> <span id="deviceSerial">N/A</span></p>
                     <p><strong>Firmware:</strong> <span id="deviceFw">N/A</span></p>
                     <p><strong>Battery:</strong> <span id="deviceBattery">N/A</span></p>
+                    <p><strong>Charging:</strong> <span id="deviceCharging">N/A</span></p>
                     <button id="refreshInfoBtn" class="btn btn-secondary" disabled>Refresh Info</button>
                 </div>
 
@@ -55,17 +57,31 @@
                     <div class="form-group">
                         <label for="ledEffect">Effect</label>
                         <select id="ledEffect" disabled>
-                            <option value="0">Static</option>
-                            <option value="1">Wave</option>
-                            <option value="2">Spectrum</option>
-                            <option value="3">Breathing</option>
-                            <option value="4">Reactive</option>
-                            <option value="5">Starlight</option>
+                            <option value="none">None / Off</option>
+                            <option value="static">Static</option>
+                            <option value="wave">Wave</option>
+                            <option value="spectrum">Spectrum</option>
+                            <option value="breathing">Breathing</option>
+                            <option value="reactive">Reactive</option>
+                            <option value="starlight">Starlight</option>
+                            <option value="wheel">Wheel</option>
                         </select>
                     </div>
-                    <div id="colorContainer" class="form-group">
+                    <div id="breathingTypeContainer" class="form-group hidden">
+                        <label for="breathingType">Breathing Type</label>
+                        <select id="breathingType" disabled>
+                            <option value="1">Single Color</option>
+                            <option value="2">Dual Color</option>
+                            <option value="3">Random</option>
+                        </select>
+                    </div>
+                    <div id="colorContainer" class="form-group hidden">
                         <label for="ledColor">Color</label>
                         <input type="color" id="ledColor" value="#00FF00" disabled>
+                    </div>
+                    <div id="color2Container" class="form-group hidden">
+                        <label for="ledColor2">Color 2</label>
+                        <input type="color" id="ledColor2" value="#0000FF" disabled>
                     </div>
                     <div id="speedContainer" class="form-group hidden">
                         <label for="ledSpeed">Speed</label>
@@ -87,7 +103,7 @@
                 <div class="card dpi-control">
                     <h2>Performance</h2>
                     <div class="form-group">
-                        <label for="dpiSelect">Polling Rate</label>
+                        <label for="pollRate">Polling Rate</label>
                         <select id="pollRate" disabled>
                             <option value="125">125 Hz</option>
                             <option value="500">500 Hz</option>
@@ -96,15 +112,64 @@
                     </div>
                     <div class="form-group">
                         <label for="dpiX">DPI X</label>
-                        <input type="number" id="dpiX" min="100" max="26000" value="800" disabled>
+                        <input type="number" id="dpiX" min="100" max="30000" value="800" disabled>
                     </div>
                     <div class="form-group">
                         <label for="dpiY">DPI Y</label>
-                        <input type="number" id="dpiY" min="100" max="26000" value="800" disabled>
+                        <input type="number" id="dpiY" min="100" max="30000" value="800" disabled>
                     </div>
                     <div class="button-group">
                         <button id="readPerfBtn" class="btn btn-secondary" disabled>Read</button>
                         <button id="applyPerfBtn" class="btn btn-primary" disabled>Apply</button>
+                    </div>
+                </div>
+
+                <div class="card scroll-control">
+                    <h2>Scroll Wheel</h2>
+                    <div class="form-group">
+                        <label for="scrollMode">Scroll Mode</label>
+                        <select id="scrollMode" disabled>
+                            <option value="0">Tactile</option>
+                            <option value="1">Free Spin</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="scrollAccel">Scroll Acceleration</label>
+                        <select id="scrollAccel" disabled>
+                            <option value="0">Off</option>
+                            <option value="1">On</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="smartReel">Smart Reel</label>
+                        <select id="smartReel" disabled>
+                            <option value="0">Off</option>
+                            <option value="1">On</option>
+                        </select>
+                    </div>
+                    <div class="button-group">
+                        <button id="readScrollBtn" class="btn btn-secondary" disabled>Read</button>
+                        <button id="applyScrollBtn" class="btn btn-primary" disabled>Apply</button>
+                    </div>
+                </div>
+
+                <div class="card power-control">
+                    <h2>Power Management</h2>
+                    <div class="form-group">
+                        <label for="idleTime">Idle Time (seconds)</label>
+                        <input type="number" id="idleTime" min="60" max="900" value="300" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label for="lowBatteryThreshold">Low Battery Threshold</label>
+                        <select id="lowBatteryThreshold" disabled>
+                            <option value="12">5% (0x0C)</option>
+                            <option value="38">15% (0x26)</option>
+                            <option value="63">25% (0x3F)</option>
+                        </select>
+                    </div>
+                    <div class="button-group">
+                        <button id="readPowerBtn" class="btn btn-secondary" disabled>Read</button>
+                        <button id="applyPowerBtn" class="btn btn-primary" disabled>Apply</button>
                     </div>
                 </div>
             </aside>
