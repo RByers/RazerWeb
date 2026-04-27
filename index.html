@@ -38,6 +38,20 @@
                             <option value="5">Backlight (5)</option>
                         </select>
                     </div>
+
+                    <hr class="divider">
+
+                    <div class="form-group">
+                        <label for="ledBrightness">Brightness</label>
+                        <input type="range" id="ledBrightness" min="0" max="255" value="255" disabled>
+                    </div>
+                    <div class="button-group">
+                        <button id="readBrightnessBtn" class="btn btn-secondary" disabled>Read</button>
+                        <button id="applyBrightnessBtn" class="btn btn-primary" disabled>Apply</button>
+                    </div>
+
+                    <hr class="divider">
+
                     <div class="form-group">
                         <label for="ledEffect">Effect</label>
                         <select id="ledEffect" disabled>
@@ -49,17 +63,24 @@
                             <option value="5">Starlight</option>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div id="colorContainer" class="form-group">
                         <label for="ledColor">Color</label>
                         <input type="color" id="ledColor" value="#00FF00" disabled>
                     </div>
-                    <div class="form-group">
-                        <label for="ledBrightness">Brightness</label>
-                        <input type="range" id="ledBrightness" min="0" max="255" value="255" disabled>
+                    <div id="speedContainer" class="form-group hidden">
+                        <label for="ledSpeed">Speed</label>
+                        <input type="number" id="ledSpeed" min="1" max="255" value="40" disabled>
+                    </div>
+                    <div id="directionContainer" class="form-group hidden">
+                        <label for="ledDirection">Direction</label>
+                        <select id="ledDirection" disabled>
+                            <option value="1">Forward (1)</option>
+                            <option value="2">Backward (2)</option>
+                        </select>
                     </div>
                     <div class="button-group">
-                        <button id="readLightingBtn" class="btn btn-secondary" disabled>Read</button>
-                        <button id="applyLightingBtn" class="btn btn-primary" disabled>Apply</button>
+                        <button id="readEffectBtn" class="btn btn-secondary" disabled>Read Effect</button>
+                        <button id="applyEffectBtn" class="btn btn-primary" disabled>Apply Effect</button>
                     </div>
                 </div>
 

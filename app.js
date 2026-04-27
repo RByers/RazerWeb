@@ -1,8 +1,10 @@
 // DOM Elements
 const connectBtn = document.getElementById('connectBtn');
 const refreshInfoBtn = document.getElementById('refreshInfoBtn');
-const applyLightingBtn = document.getElementById('applyLightingBtn');
-const readLightingBtn = document.getElementById('readLightingBtn');
+const readBrightnessBtn = document.getElementById('readBrightnessBtn');
+const applyBrightnessBtn = document.getElementById('applyBrightnessBtn');
+const readEffectBtn = document.getElementById('readEffectBtn');
+const applyEffectBtn = document.getElementById('applyEffectBtn');
 const applyPerfBtn = document.getElementById('applyPerfBtn');
 const readPerfBtn = document.getElementById('readPerfBtn');
 const clearLogBtn = document.getElementById('clearLogBtn');
@@ -17,6 +19,12 @@ const ledZoneSelect = document.getElementById('ledZone');
 const ledEffectSelect = document.getElementById('ledEffect');
 const ledColorInput = document.getElementById('ledColor');
 const ledBrightnessInput = document.getElementById('ledBrightness');
+const ledSpeedInput = document.getElementById('ledSpeed');
+const ledDirectionSelect = document.getElementById('ledDirection');
+
+const colorContainer = document.getElementById('colorContainer');
+const speedContainer = document.getElementById('speedContainer');
+const directionContainer = document.getElementById('directionContainer');
 const pollRateSelect = document.getElementById('pollRate');
 const dpiXInput = document.getElementById('dpiX');
 const dpiYInput = document.getElementById('dpiY');
@@ -108,12 +116,40 @@ async function disconnectDevice() {
 
 function enableControls(enable) {
     const elements = [
-        refreshInfoBtn, applyLightingBtn, readLightingBtn, applyPerfBtn, readPerfBtn,
-        ledZoneSelect, ledEffectSelect, ledColorInput, ledBrightnessInput,
+        refreshInfoBtn, readBrightnessBtn, applyBrightnessBtn, readEffectBtn, applyEffectBtn, readPerfBtn, applyPerfBtn,
+        ledZoneSelect, ledEffectSelect, ledColorInput, ledBrightnessInput, ledSpeedInput, ledDirectionSelect,
         pollRateSelect, dpiXInput, dpiYInput
     ];
     elements.forEach(el => el.disabled = !enable);
+    if (enable) updateLightingUI();
 }
+
+function updateLightingUI() {
+    const eff = parseInt(ledEffectSelect.value);
+    
+    colorContainer.classList.add('hidden');
+    speedContainer.classList.add('hidden');
+    directionContainer.classList.add('hidden');
+
+    if (eff === 0) { // Static
+        colorContainer.classList.remove('hidden');
+    } else if (eff === 1) { // Wave
+        speedContainer.classList.remove('hidden');
+        directionContainer.classList.remove('hidden');
+        if (ledSpeedInput.value == 1 || ledSpeedInput.value == 40) ledSpeedInput.value = 40;
+    } else if (eff === 3) { // Breathing
+        colorContainer.classList.remove('hidden');
+    } else if (eff === 4) { // Reactive
+        colorContainer.classList.remove('hidden');
+        speedContainer.classList.remove('hidden');
+        if (ledSpeedInput.value == 40) ledSpeedInput.value = 1;
+    } else if (eff === 5) { // Starlight
+        colorContainer.classList.remove('hidden');
+        speedContainer.classList.remove('hidden');
+        if (ledSpeedInput.value == 40) ledSpeedInput.value = 1;
+    }
+}
+ledEffectSelect.addEventListener('change', updateLightingUI);
 
 async function sendCommand(cmdObj) {
     if (!razerDevice) return null;
@@ -163,6 +199,7 @@ function handleResponse(responseArray) {
         };
         if (effMap[decoded.effect] !== undefined) {
             ledEffectSelect.value = effMap[decoded.effect];
+            updateLightingUI();
         }
     } else if (decoded.command === "GetPollingRate") {
         pollRateSelect.value = decoded.rate;
@@ -179,34 +216,60 @@ refreshInfoBtn.addEventListener('click', async () => {
     }, 100);
 });
 
-readLightingBtn.addEventListener('click', async () => {
+readBrightnessBtn.addEventListener('click', async () => {
     const ledId = parseInt(ledZoneSelect.value);
     await sendCommand({ command: 'GetExtendedBrightness', ledId: ledId });
+});
+
+applyBrightnessBtn.addEventListener('click', async () => {
+    const ledId = parseInt(ledZoneSelect.value);
+    const brightness = parseInt(ledBrightnessInput.value);
+    await sendCommand({ command: 'SetExtendedBrightness', brightness: brightness, ledId: ledId });
+});
+
+readEffectBtn.addEventListener('click', async () => {
+    const ledId = parseInt(ledZoneSelect.value);
     await sendCommand({ command: 'GetExtendedMatrixEffect', ledId: ledId });
 });
 
-applyLightingBtn.addEventListener('click', async () => {
+applyEffectBtn.addEventListener('click', async () => {
     const ledId = parseInt(ledZoneSelect.value);
     const effectIndex = parseInt(ledEffectSelect.value);
-    const colorHex = ledColorInput.value;
-    const r = parseInt(colorHex.substr(1, 2), 16);
-    const g = parseInt(colorHex.substr(3, 2), 16);
-    const b = parseInt(colorHex.substr(5, 2), 16);
-    const brightness = parseInt(ledBrightnessInput.value);
-
-    // Apply brightness first
-    await sendCommand({ command: 'SetExtendedBrightness', brightness: brightness, ledId: ledId });
-
+    
     // Determine effect string
     const effects = ['static', 'wave', 'spectrum', 'breathing', 'reactive', 'starlight'];
     const effectName = effects[effectIndex] || 'static';
 
-    await sendCommand({ 
+    const cmdObj = { 
         command: 'SetExtendedMatrixEffect', 
         effect: effectName,
-        r: r, g: g, b: b,
         ledId: ledId
-    });
+    };
+
+    // Attach only the relevant parameters for the chosen effect
+    if (['static', 'reactive'].includes(effectName)) {
+        const colorHex = ledColorInput.value;
+        cmdObj.r = parseInt(colorHex.substr(1, 2), 16);
+        cmdObj.g = parseInt(colorHex.substr(3, 2), 16);
+        cmdObj.b = parseInt(colorHex.substr(5, 2), 16);
+        if (effectName === 'reactive') {
+            cmdObj.speed = parseInt(ledSpeedInput.value);
+        }
+    } else if (['breathing', 'starlight'].includes(effectName)) {
+        const colorHex = ledColorInput.value;
+        cmdObj.type = 1; // 1 = Single Color (2=Dual, 3=Random)
+        cmdObj.r1 = parseInt(colorHex.substr(1, 2), 16);
+        cmdObj.g1 = parseInt(colorHex.substr(3, 2), 16);
+        cmdObj.b1 = parseInt(colorHex.substr(5, 2), 16);
+        if (effectName === 'starlight') {
+            cmdObj.speed = parseInt(ledSpeedInput.value);
+        }
+    } else if (effectName === 'wave') {
+        cmdObj.direction = parseInt(ledDirectionSelect.value);
+        cmdObj.speed = parseInt(ledSpeedInput.value);
+    }
+
+    await sendCommand(cmdObj);
 });
 
 readPerfBtn.addEventListener('click', async () => {

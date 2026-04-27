@@ -276,6 +276,17 @@ input[type="range"] {
     border-left-color: #3b82f6;
 }
 
+.hidden {
+    display: none !important;
+}
+
+.divider {
+    border: none;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 1.5rem 0;
+}
+
 .log-entry.error {
     border-left-color: #ef4444;
 }
