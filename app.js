@@ -189,8 +189,6 @@ connectBtn.addEventListener('click', async () => {
 });
 
 async function connectDevice(devices) {
-    logMessage('SYS', `Finding correct configuration interface among ${devices.length} endpoints...`, 'tx');
-
     for (const device of devices) {
         try {
             if (!device.opened) await device.open();
@@ -213,14 +211,13 @@ async function connectDevice(devices) {
             // Look up device profile by PID
             const profile = DeviceCapabilities.getProfile(device.productId) || DeviceCapabilities.defaultProfile;
             if (!DeviceCapabilities.getProfile(device.productId)) {
-                logMessage('SYS', `Unknown device PID 0x${device.productId.toString(16).padStart(4,'0')} — showing all controls. Use "Show All" toggle to control visibility.`, 'tx');
+                logMessage('SYS', `Successfully connected to ${device.productName} (Unknown PID 0x${device.productId.toString(16).padStart(4, '0')}). Showing all controls.<br><pre class="json-payload">${JSON.stringify(profile, null, 2)}</pre>`, 'tx');
             } else {
-                logMessage('SYS', `Matched device profile: ${profile.name}`, 'tx');
+                logMessage('SYS', `Successfully connected to ${device.productName} (Matched profile: ${profile.name})<br><pre class="json-payload">${JSON.stringify(profile, null, 2)}</pre>`, 'tx');
             }
 
             applyCapabilities(profile);
             enableControls(true);
-            logMessage('SYS', `Successfully connected to interface: ${device.productName}`, 'tx');
 
             handleResponse(responseArray);
 
@@ -560,7 +557,7 @@ function logMessage(label, data, type) {
     const entry = document.createElement('div');
     entry.className = `log-entry ${type}`;
 
-    const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit', fractionalSecondDigits: 3 });
+    const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
 
     let displayData = data;
     let rawToggle = "";
@@ -575,7 +572,7 @@ function logMessage(label, data, type) {
                          <div style="word-break: break-all; margin-top: 0.25rem; font-family: monospace;">${hexDump}</div>
                       </details>`;
     } else if (typeof data === 'object') {
-        displayData = JSON.stringify(data);
+        displayData = `<pre class="json-payload">${JSON.stringify(data, null, 2)}</pre>`;
     }
 
     entry.innerHTML = `
