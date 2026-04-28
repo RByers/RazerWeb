@@ -1,6 +1,6 @@
 # Razer Web Configurator
 
-A vanilla Web HID application for configuring Razer peripherals (mice, keyboards, etc) directly from your web browser. Built without any external dependencies.
+A vanilla Web HID application for configuring Razer peripherals (mice, keyboards, etc) directly from your web browser. Built without any external dependencies. Served from [razerweb.rbyers.ca](https://razerweb.rbyers.ca/)
 
 ## Architecture
 
