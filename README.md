@@ -1,10 +1,10 @@
 # Razer Web Configurator
 
-A vanilla Web HID application for configuring Razer peripherals (mice, keyboards, etc) directly from your web browser. Built without any external dependencies. Served from [razerweb.rbyers.ca](https://razerweb.rbyers.ca/)
+A vanilla Web HID application for configuring Razer mice directly from your web browser. Served from [razerweb.rbyers.ca](https://razerweb.rbyers.ca/). Vibe coded with Antigravity/Gemini and Claude Code, not well tested and likely fully of bugs.
 
 ## Architecture
 
-This application consists of a simple Vanilla JS stack:
+This application consists of a simple Vanilla JS stack (no dependencies):
 - `index.html`: Layout and semantic structure. Contains a sidebar for controls and a main area for real-time debug logging.
 - `style.css`: Premium dark mode UI featuring CSS grid/flexbox, custom animations, and a glassmorphism aesthetic tailored to the Razer brand.
 - `app.js`: The application logic layer. 
