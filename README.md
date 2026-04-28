@@ -25,3 +25,7 @@ A detailed, byte-by-byte breakdown of the protocol is available in [PROTOCOL.md]
 3. Click **Connect Device** and select your Razer mouse from the browser prompt.
 4. Modify lighting or performance parameters and click Apply.
 5. Watch the raw HID hex payloads being transmitted and received in the Debug panel.
+
+## Acknowledgements and Licensing
+
+The protocol implementation in this application was made possible by studying the [OpenRazer](https://github.com/openrazer/openrazer) project. RazerWeb is licensed under the **GNU General Public License v2.0 (GPLv2)**. See the [LICENSE](./LICENSE) file for the full text.

@@ -14,6 +14,9 @@ const applyPowerBtn = document.getElementById('applyPowerBtn');
 const clearLogBtn = document.getElementById('clearLogBtn');
 const showAllToggle = document.getElementById('showAllToggle');
 const debugLog = document.getElementById('debugLog');
+const aboutBtn = document.getElementById('aboutBtn');
+const aboutModal = document.getElementById('aboutModal');
+const closeAboutBtn = document.getElementById('closeAboutBtn');
 
 const deviceNameEl = document.getElementById('deviceName');
 const deviceSerialEl = document.getElementById('deviceSerial');
@@ -535,6 +538,21 @@ applyPowerBtn.addEventListener('click', async () => {
 });
 
 clearLogBtn.addEventListener('click', () => { debugLog.innerHTML = ''; });
+
+aboutBtn.addEventListener('click', () => {
+    aboutModal.classList.remove('hidden');
+});
+
+closeAboutBtn.addEventListener('click', () => {
+    aboutModal.classList.add('hidden');
+});
+
+// Close modal when clicking outside
+aboutModal.addEventListener('click', (e) => {
+    if (e.target === aboutModal) {
+        aboutModal.classList.add('hidden');
+    }
+});
 
 // ── Debug Logging ──
 

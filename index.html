@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="app-container">
         <header class="app-header">
@@ -17,6 +19,7 @@
                 <label class="toggle-label" title="Show all controls, even for unsupported features">
                     <input type="checkbox" id="showAllToggle"> Show All
                 </label>
+                <button id="aboutBtn" class="btn btn-secondary">About</button>
                 <button id="connectBtn" class="btn btn-primary">Connect Device</button>
             </div>
         </header>
@@ -193,8 +196,30 @@
             </section>
         </main>
     </div>
+
+    <!-- About Modal -->
+    <div id="aboutModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>About <span class="highlight">Razer</span>Web</h2>
+                <button id="closeAboutBtn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>RazerWeb is an open-source WebHID configurator for Razer peripherals. Configure your mouse natively from your browser without heavy background software.</p>
+                <div class="repo-link">
+                    <a href="https://github.com/RByers/RazerWeb" target="_blank" class="btn btn-secondary">View on GitHub</a>
+                </div>
+
+                <h3>Acknowledgements</h3>
+                <p>Special thanks to the <a href="https://github.com/openrazer/openrazer" target="_blank">OpenRazer</a> project and its contributors.
+                <p class="license-note">RazerWeb is licensed under the <strong>GNU General Public License v2.0 (GPLv2)</strong>.</p>
+            </div>
+        </div>
+    </div>
+
     <script src="protocol.js"></script>
     <script src="devices.js"></script>
     <script src="app.js"></script>
 </body>
+
 </html>
